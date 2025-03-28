@@ -1,33 +1,34 @@
-FROM ubuntu:18.04
+# Use an official Python runtime as a parent image
+FROM python:3.6
 
-ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update
-RUN echo y | apt-get install locales
-RUN echo y | apt install build-essential
-RUN apt -qq install -y --no-install-recommends \
-    curl \
-    git \
-    gnupg2 \
-    wget \
+# Set the working directory in the container
+WORKDIR /app
 
-RUN set -ex; \
-    apt-get update \
-    && apt-get install -y --no-install-recommends \
-        busybox \
-	git \
-	python3 \
-	python3-dev \
-	python3-pip \
-	python3-lxml \
-	pv \
-	&& apt-get autoclean \
-        && apt-get autoremove \
-        && rm -rf /var/lib/apt/lists/*
-
-RUN pip3 install setuptools wheel yarl multidict
-COPY requirements.txt .
-RUN pip3 install -r requirements.txt
-RUN dpkg-reconfigure locales
+# Copy the current directory contents into the container at /app
 COPY . /app
 
-CMD ["python3", "bot.py"]
+# Install any needed packages specified in requirements.txt
+RUN apt-get update && apt-get install -y \
+    git \
+    libxml2-dev \
+    libxslt1-dev \
+    zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install --upgrade pip setuptools wheel
+
+# Install specific packages first to take advantage of Docker caching
+RUN pip3 install yarl multidict
+
+# Copy the requirements file into the container and install dependencies
+COPY requirements.txt .
+
+# Install the dependencies
+RUN pip3 install -r requirements.txt || \
+    (echo "Could not find pyrofork package, please check the source or remove it from requirements.txt" && exit 1)
+
+# Make port 80 available to the world outside this container
+EXPOSE 80
+
+# Run app.py when the container launches
+CMD ["python", "app.py"]
